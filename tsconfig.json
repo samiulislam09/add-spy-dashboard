@@ -1,34 +1,40 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
     "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "plugins": [{ "name": "next" }],
+    "allowJs": false,
     "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@cia/ai/*": ["ai/src/*"],
+      "@cia/analytics/*": ["analytics/src/*"],
+      "@cia/db/*": ["db/src/*"],
+      "@cia/ingestion/*": ["ingestion/src/*"],
+      "@cia/types/*": ["types/src/*"],
+      "@cia/ui/*": ["ui/src/*"],
+      "@cia/utils/*": ["utils/src/*"]
     }
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "worker/src/**/*.ts",
+    "ai/src/**/*.ts",
+    "analytics/src/**/*.ts",
+    "db/src/**/*.ts",
+    "db/prisma/**/*.ts",
+    "ingestion/src/**/*.ts",
+    "types/src/**/*.ts",
+    "ui/src/**/*.ts",
+    "ui/src/**/*.tsx",
+    "utils/src/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }

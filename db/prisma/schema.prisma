@@ -1,0 +1,425 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum Platform {
+  META
+  TIKTOK
+  GOOGLE
+  OTHER
+}
+
+enum AdStatus {
+  ACTIVE
+  INACTIVE
+  PAUSED
+  UNKNOWN
+}
+
+enum AdFormat {
+  IMAGE
+  VIDEO
+  CAROUSEL
+  TEXT
+  COLLECTION
+  UNKNOWN
+}
+
+enum IngestionSourceType {
+  META_PUBLIC
+  TIKTOK_PUBLIC
+  GOOGLE_TRANSPARENCY
+  CSV
+  JSON
+  MOCK
+}
+
+enum IngestionRunStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+enum AlertRuleType {
+  NEW_AD_DETECTED
+  COPY_CHANGED
+  NEW_OFFER
+  NEW_CTA
+  NEW_VIDEO
+  NEW_COUNTRY
+}
+
+enum EventType {
+  NEW_AD
+  COPY_CHANGE
+  SNAPSHOT_CHANGE
+  OFFER_CHANGE
+  CTA_CHANGE
+  NEW_COUNTRY
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  name          String
+  role          Role          @default(MEMBER)
+  memberships   Membership[]
+  collections   Collection[]
+  savedSearches SavedSearch[]
+  alertRules    AlertRule[]
+  auditLogs     AuditLog[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Workspace {
+  id              String            @id @default(cuid())
+  slug            String            @unique
+  name            String
+  memberships     Membership[]
+  competitors     Competitor[]
+  collections     Collection[]
+  savedSearches   SavedSearch[]
+  alertRules      AlertRule[]
+  ingestionSources IngestionSource[]
+  importFiles     ImportFile[]
+  auditLogs       AuditLog[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model Membership {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        Role      @default(MEMBER)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, workspaceId])
+}
+
+model Competitor {
+  id           String     @id @default(cuid())
+  workspaceId  String
+  advertiserId String
+  notes        String?
+  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  advertiser   Advertiser @relation(fields: [advertiserId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([workspaceId, advertiserId])
+}
+
+model Advertiser {
+  id                    String      @id @default(cuid())
+  platform              Platform
+  externalAdvertiserId  String
+  name                  String
+  normalizedName        String
+  profileUrl            String?
+  website               String?
+  countries             Json
+  metadataJson          Json?
+  ads                   Ad[]
+  competitors           Competitor[]
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  @@unique([platform, externalAdvertiserId])
+  @@index([normalizedName])
+  @@index([platform])
+}
+
+model Ad {
+  id               String            @id @default(cuid())
+  advertiserId     String
+  platform         Platform
+  externalAdId     String
+  status           AdStatus
+  adFormat         AdFormat
+  language         String?
+  primaryText      String?           @db.Text
+  headline         String?
+  description      String?           @db.Text
+  cta              String?
+  destinationUrl   String?
+  firstSeenAt      DateTime
+  lastSeenAt       DateTime
+  currentlyActive  Boolean           @default(false)
+  currency         String?
+  rawPayloadJson   Json?
+  creativeHash     String?
+  copyHash         String?
+  advertiser       Advertiser        @relation(fields: [advertiserId], references: [id], onDelete: Cascade)
+  creatives        Creative[]
+  snapshots        AdSnapshot[]
+  tags             AdTagMap[]
+  analysis         MessagingAnalysis?
+  landingPages     LandingPage[]
+  alertEvents      AlertEvent[]
+  collectionItems  CollectionItem[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@unique([platform, externalAdId])
+  @@index([advertiserId])
+  @@index([platform, currentlyActive])
+  @@index([firstSeenAt])
+  @@index([lastSeenAt])
+  @@index([adFormat])
+  @@index([language])
+}
+
+model Creative {
+  id               String   @id @default(cuid())
+  adId             String
+  mediaType        String
+  mediaUrl         String
+  thumbnailUrl     String?
+  width            Int?
+  height           Int?
+  durationMs       Int?
+  previewText      String?  @db.Text
+  localStorageKey  String?
+  metadataJson     Json?
+  ad               Ad       @relation(fields: [adId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([adId])
+}
+
+model LandingPage {
+  id             String   @id @default(cuid())
+  adId           String
+  url            String
+  title          String?
+  description    String?  @db.Text
+  screenshotUrl  String?
+  metadataJson   Json?
+  ad             Ad       @relation(fields: [adId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([adId])
+}
+
+model AdSnapshot {
+  id             String   @id @default(cuid())
+  adId           String
+  snapshotAt     DateTime
+  primaryText    String?  @db.Text
+  headline       String?
+  description    String?  @db.Text
+  cta            String?
+  destinationUrl String?
+  rawPayloadJson Json?
+  changeSummary  String?  @db.Text
+  ad             Ad       @relation(fields: [adId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@index([adId, snapshotAt])
+}
+
+model AdTag {
+  id         String    @id @default(cuid())
+  key        String
+  value      String
+  adLinks    AdTagMap[]
+  createdAt  DateTime  @default(now())
+
+  @@unique([key, value])
+}
+
+model AdTagMap {
+  id      String @id @default(cuid())
+  adId    String
+  adTagId String
+  ad      Ad     @relation(fields: [adId], references: [id], onDelete: Cascade)
+  adTag   AdTag  @relation(fields: [adTagId], references: [id], onDelete: Cascade)
+
+  @@unique([adId, adTagId])
+}
+
+model MessagingAnalysis {
+  id                    String   @id @default(cuid())
+  adId                  String   @unique
+  hook                  String?  @db.Text
+  hookType              String?
+  angle                 String?
+  tone                  String?
+  audienceIntent        String?
+  offerType             String?
+  urgencySignals        Json?
+  socialProofSignals    Json?
+  ctaType               String?
+  painPoints            Json?
+  benefits              Json?
+  emotionalTriggers     Json?
+  summary               String?  @db.Text
+  keywords              Json?
+  embeddingRef          String?
+  confidenceScoresJson  Json?
+  ad                    Ad       @relation(fields: [adId], references: [id], onDelete: Cascade)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([hookType])
+  @@index([tone])
+  @@index([offerType])
+}
+
+model Collection {
+  id          String           @id @default(cuid())
+  userId      String
+  workspaceId String
+  name        String
+  description String?
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  items       CollectionItem[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([workspaceId])
+}
+
+model CollectionItem {
+  id           String     @id @default(cuid())
+  collectionId String
+  adId         String
+  notes        String?
+  sortOrder    Int        @default(0)
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  ad           Ad         @relation(fields: [adId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([collectionId, adId])
+}
+
+model SavedSearch {
+  id           String    @id @default(cuid())
+  userId       String
+  workspaceId  String
+  name         String
+  filtersJson  Json
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([workspaceId])
+}
+
+model AlertRule {
+  id             String        @id @default(cuid())
+  workspaceId    String
+  userId         String
+  name           String
+  type           AlertRuleType
+  conditionsJson Json
+  isActive       Boolean       @default(true)
+  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events         AlertEvent[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([workspaceId, isActive])
+}
+
+model AlertEvent {
+  id           String     @id @default(cuid())
+  alertRuleId  String
+  adId         String?
+  eventType    EventType
+  payloadJson  Json?
+  triggeredAt  DateTime
+  alertRule    AlertRule  @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
+  ad           Ad?        @relation(fields: [adId], references: [id], onDelete: SetNull)
+  createdAt    DateTime   @default(now())
+
+  @@index([alertRuleId, triggeredAt])
+}
+
+model IngestionSource {
+  id            String              @id @default(cuid())
+  workspaceId   String
+  type          IngestionSourceType
+  name          String
+  isEnabled     Boolean             @default(true)
+  configJson    Json?
+  workspace     Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runs          IngestionRun[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([workspaceId, isEnabled])
+}
+
+model IngestionRun {
+  id               String             @id @default(cuid())
+  ingestionSourceId String
+  status           IngestionRunStatus
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  recordsIn        Int                @default(0)
+  recordsOut       Int                @default(0)
+  errorsJson       Json?
+  warningsJson     Json?
+  runMetaJson      Json?
+  ingestionSource  IngestionSource    @relation(fields: [ingestionSourceId], references: [id], onDelete: Cascade)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([ingestionSourceId, status])
+  @@index([createdAt])
+}
+
+model ImportFile {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  sourceType    IngestionSourceType
+  fileName      String
+  mimeType      String?
+  storageKey    String
+  status        String
+  metadataJson  Json?
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([workspaceId])
+}
+
+model AuditLog {
+  id           String    @id @default(cuid())
+  workspaceId  String?
+  userId       String?
+  action       String
+  entityType   String
+  entityId     String?
+  payloadJson  Json?
+  workspace    Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt    DateTime   @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@index([entityType, entityId])
+}

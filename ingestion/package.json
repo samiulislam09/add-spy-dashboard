@@ -1,0 +1,25 @@
+{
+  "name": "@cia/ingestion",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  },
+  "dependencies": {
+    "@cia/ai": "file:../ai",
+    "@cia/db": "file:../db",
+    "@cia/types": "file:../types",
+    "@cia/utils": "file:../utils",
+    "csv-parse": "^6.1.0",
+    "date-fns": "^4.1.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "typescript": "^5.9.3"
+  }
+}
